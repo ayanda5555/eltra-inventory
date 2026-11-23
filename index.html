@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ELTRA-CONNECT Inventory</title>
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0056b3">
+    
+    <link rel="stylesheet" href="style.css?v=8">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+
+    <div id="screen-login" class="screen active">
+        <div class="login-box">
+            <h1>ELTRA-CONNECT</h1>
+            <p>Inventory & Asset Tracking</p>
+            <div class="input-group">
+                <label>User ID or Email</label>
+                <input type="text" id="login-user" placeholder="e.g. USR-001">
+            </div>
+            <div class="input-group">
+                <label>PIN</label>
+                <input type="password" id="login-pin" placeholder="****" maxlength="6">
+            </div>
+            <button onclick="doLogin()" class="btn primary">Log In</button>
+            <p id="login-error" class="error-msg"></p>
+        </div>
+    </div>
+
+    <div id="screen-dashboard" class="screen">
+        <header>
+            <h2 id="welcome-text">Welcome</h2>
+            <button onclick="doLogout()" class="btn small danger">Logout</button>
+        </header>
+        <div class="dashboard-stats">
+            <div class="stat-card"><h3>Total Items</h3><p id="stat-items">0</p></div>
+            <div class="stat-card"><h3>Assigned Assets</h3><p id="stat-assets">0</p></div>
+        </div>
+        <div class="quick-actions">
+            <button class="action-btn" onclick="openScanner()">📷 Scan QR</button>
+            <button class="action-btn" onclick="showScreen('screen-receive'); loadDropdowns();">📥 Receive Stock</button>
+            <button class="action-btn" onclick="showScreen('screen-issue'); loadDropdowns();">📤 Issue Stock</button>
+            <button class="action-btn" onclick="showScreen('screen-assets'); loadAssets();">🛠️ Manage Assets</button>
+            <button class="action-btn" onclick="showScreen('screen-maintenance'); loadAssets();">🔧 Maintenance</button>
+            <button class="action-btn" onclick="showScreen('screen-requests'); loadDropdowns();">📝 Request Stock</button>
+            <button class="action-btn" onclick="showScreen('screen-add-item'); loadCategoriesAndSuppliers();">➕ Add New Item</button>
+            <button class="action-btn" onclick="showScreen('screen-reports')">📊 Reports</button>
+            <button class="action-btn" onclick="showScreen('screen-print'); loadLabels();">🖨️ Print Labels</button>
+        </div>
+        <div class="low-stock-section">
+            <h3>Low Stock Alerts</h3>
+            <ul id="low-stock-list"><li>Loading...</li></ul>
+        </div>
+    </div>
+
+    <div id="screen-add-item" class="screen">
+        <header><button onclick="showScreen('screen-dashboard')" class="btn small">← Back</button><h2>Add New Item</h2></header>
+        <div class="form-box">
+            <label>Item Code (e.g. CAB-25R)</label><input type="text" id="add-code" placeholder="e.g. CAB-25R" required>
+            <label>Item Name (e.g. 2.5mm Red Cable)</label><input type="text" id="add-name" placeholder="Item Name" required>
+            <label>Category</label><select id="add-category"></select>
+            <label>Supplier</label><select id="add-supplier"></select>
+            <label>Unit of Measure (e.g. metre, piece)</label><input type="text" id="add-uom" placeholder="e.g. metre" required>
+            <label>Minimum Stock Level</label><input type="number" id="add-min" placeholder="e.g. 50" required>
+            <label>Unit Cost</label><input type="number" step="0.01" id="add-cost" placeholder="e.g. 1.50">
+            <label>Brand</label><input type="text" id="add-brand" placeholder="e.g. Generic">
+            <button onclick="submitItem()" class="btn primary" style="margin-top:15px;">Save Item to Database</button>
+        </div>
+    </div>
+
+    <div id="screen-receive" class="screen">
+        <header><button onclick="showScreen('screen-dashboard')" class="btn small">← Back</button><h2>Receive Stock</h2></header>
+        <div class="form-box">
+            <label>Select Item</label><select id="rec-item"></select>
+            <label>Quantity Received</label><input type="number" id="rec-qty" min="1">
+            <label>Invoice / GRN Number</label><input type="text" id="rec-ref" placeholder="e.g. INV-1234">
+            <button onclick="submitReceive()" class="btn primary" style="margin-top:15px;">Record Receipt</button>
+        </div>
+    </div>
+
+    <div id="screen-issue" class="screen">
+        <header><button onclick="showScreen('screen-dashboard')" class="btn small">← Back</button><h2>Issue Stock</h2></header>
+        <div class="form-box">
+            <label>Select Item</label><select id="iss-item"></select>
+            <label>Quantity to Issue</label><input type="number" id="iss-qty" min="1">
+            <button onclick="submitIssue()" class="btn primary" style="margin-top:15px;">Record Issue</button>
+        </div>
+    </div>
+
+    <div id="screen-requests" class="screen">
+        <header><button onclick="showScreen('screen-dashboard')" class="btn small">← Back</button><h2>Request Stock</h2></header>
+        <div class="form-box">
+            <label>Select Item</label><select id="req-item"></select>
+            <label>Quantity Requested</label><input type="number" id="req-qty" min="1">
+            <label>Priority</label>
+            <select id="req-priority">
+                <option value="Normal">Normal</option>
+                <option value="High">High</option>
+                <option value="Urgent">Urgent</option>
+            </select>
+            <button onclick="submitRequest()" class="btn primary" style="margin-top:15px;">Submit Request</button>
+        </div>
+    </div>
+
+    <div id="screen-assets" class="screen">
+        <header><button onclick="showScreen('screen-dashboard')" class="btn small">← Back</button><h2>Manage Assets</h2></header>
+        <div class="form-box">
+            <label>Select Asset</label><select id="asset-select"></select>
+            <label>Assign To (User ID / Blank to Return)</label><input type="text" id="asset-user" placeholder="e.g. USR-003">
+            <label>Condition</label>
+            <select id="asset-condition">
+                <option value="Good">Good</option><option value="Excellent">Excellent</option>
+                <option value="Fair">Fair</option><option value="Poor">Poor</option><option value="Faulty">Faulty</option>
+            </select>
+            <button onclick="submitAssetAssignment()" class="btn primary" style="margin-top:15px;">Update Asset</button>
+        </div>
+    </div>
+
+    <div id="screen-maintenance" class="screen">
+        <header><button onclick="showScreen('screen-dashboard')" class="btn small">← Back</button><h2>Maintenance</h2></header>
+        <div class="form-box">
+            <label>Select Asset</label><select id="maint-asset"></select>
+            <label>Fault / Service Reason</label><input type="text" id="maint-fault" placeholder="e.g. Broken switch">
+            <label>Work Done</label><input type="text" id="maint-work" placeholder="e.g. Replaced switch">
+            <label>Cost</label><input type="number" id="maint-cost" placeholder="0.00">
+            <button onclick="submitMaintenance()" class="btn primary" style="margin-top:15px;">Log Maintenance</button>
+        </div>
+    </div>
+
+    <div id="screen-reports" class="screen">
+        <header><button onclick="showScreen('screen-dashboard')" class="btn small">← Back</button><h2>Reports</h2></header>
+        <div class="quick-actions" style="grid-template-columns: 1fr;">
+            <button class="action-btn" onclick="downloadReport('stock')">📦 Current Stock Report</button>
+            <button class="action-btn" onclick="downloadReport('movements')">🔄 Stock Movements Report</button>
+            <button class="action-btn" onclick="downloadReport('assets')">🛠️ Asset Register Report</button>
+        </div>
+    </div>
+
+    <div id="screen-print" class="screen">
+        <header><button onclick="showScreen('screen-dashboard')" class="btn small">← Back</button><h2>Print QR Labels</h2></header>
+        <button onclick="window.print()" class="btn primary" style="margin-bottom: 15px;">🖨️ Print This Page</button>
+        <div id="label-container" class="label-grid"></div>
+    </div>
+
+    <div id="screen-scanner" class="screen">
+        <header><button onclick="closeScanner()" class="btn small">← Back</button><h2>Scan QR Code</h2></header>
+        <div id="reader"></div>
+        <div id="scan-result" class="hidden">
+            <h3 id="scanned-title">Item Found</h3>
+            <p id="scanned-details"></p>
+            <div id="scan-actions" style="margin-top: 15px; display: flex; gap: 10px; flex-direction: column;"></div>
+            <button onclick="closeScanner()" class="btn primary" style="margin-top:15px; background-color: #666;">Done</button>
+        </div>
+    </div>
+
+    <script src="qr-generator.js?v=8"></script>
+    <script src="app.js?v=8"></script>
+    <script src="scanner.js?v=8"></script>
+
+    <!-- Register Service Worker for Android App install -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+            .then(() => console.log('Service Worker Registered'))
+            .catch(err => console.log('SW Error', err));
+        }
+    </script>
+</body>
+</html>
