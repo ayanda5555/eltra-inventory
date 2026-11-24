@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ELTRA-CONNECT Inventory</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0056b3">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+
+    <!-- OFFLINE BANNER -->
+    <div id="offline-banner" style="display:none; background:#dc3545; color:white; text-align:center; padding:10px; font-weight:bold; position:absolute; top:0; width:100%; z-index:9999;">
+        ⚠️ Offline Mode - Data will save locally
+    </div>
+
+    <div id="screen-login" class="screen active">
+        <div class="login-box">
+            <h1>ELTRA-CONNECT</h1>
+            <p>Inventory System</p>
+            <div class="input-group"><label>User ID</label><input type="text" id="login-user" placeholder="e.g. USR-001"></div>
+            <div class="input-group"><label>PIN</label><input type="password" id="login-pin" placeholder="****" maxlength="6"></div>
+            <button onclick="doLogin()" class="btn primary">Log In</button>
+            <p id="login-error" class="error-msg"></p>
+        </div>
+    </div>
+
+    <div id="screen-dashboard" class="screen">
+        <header>
+            <h2 id="welcome-text">Welcome</h2>
+            <div style="display:flex; gap:5px;">
+                <button onclick="syncOfflineData()" class="btn small" id="sync-btn">🔄 Sync</button>
+                <button onclick="doLogout()" class="btn small danger">Logout</button>
+            </div>
+        </header>
+        <div class="dashboard-stats">
+            <div class="stat-card"><h3>Total Items</h3><p id="stat-items">0</p></div>
+        </div>
+        <div class="quick-actions">
+            <button class="action-btn" onclick="openScanner()">📷 Scan QR</button>
+            <button class="action-btn" onclick="showScreen('screen-receive'); loadReceiveForm();">📥 Receive Stock</button>
+            <button class="action-btn" onclick="showScreen('screen-reports')">📊 Reports</button>
+        </div>
+        <div class="low-stock-section"><h3>Low Stock Alerts</h3><ul id="low-stock-list"><li>Loading...</li></ul></div>
+    </div>
+
+    <div id="screen-receive" class="screen">
+        <header><button onclick="showScreen('screen-dashboard')" class="btn small">← Back</button><h2>Receive Stock</h2></header>
+        <div class="form-box">
+            <label>Select Item</label><select id="rec-item"></select>
+            <label>Quantity Received</label><input type="number" id="rec-qty" min="1">
+            <label>Invoice Number</label><input type="text" id="rec-ref" placeholder="e.g. INV-1234">
+            
+            <!-- PHOTO UPLOAD -->
+            <label>📸 Attach Receipt/Photo (Optional)</label>
+            <input type="file" id="rec-photo" accept="image/*" capture="environment" style="border: 1px solid #ccc; padding: 10px; border-radius: 6px; width: 100%; background: white;">
+
+            <button onclick="submitReceive()" class="btn primary" style="margin-top:15px;">Record Receipt</button>
+        </div>
+    </div>
+
+    <div id="screen-reports" class="screen">
+        <header><button onclick="showScreen('screen-dashboard')" class="btn small">← Back</button><h2>Reports</h2></header>
+        <div class="quick-actions" style="grid-template-columns: 1fr;">
+            <button class="action-btn" onclick="downloadReport('stock')">📦 Current Stock Report</button>
+            <button class="action-btn" onclick="downloadReport('movements')">🔄 Stock Movements Report</button>
+        </div>
+    </div>
+
+    <div id="screen-scanner" class="screen">
+        <header><button onclick="closeScanner()" class="btn small">← Back</button><h2>Scan</h2></header>
+        <div id="reader"></div>
+        <div id="scan-result" class="hidden">
+            <h3 id="scanned-title">Item Found</h3><p id="scanned-details"></p>
+            <button onclick="closeScanner()" class="btn primary">Done</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script src="scanner.js"></script>
+</body>
+</html>
