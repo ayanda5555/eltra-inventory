@@ -8,8 +8,17 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-
-body { background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+body { 
+    background-color: var(--bg); 
+    color: var(--text); 
+    display: flex; 
+    flex-direction: column; 
+    height: 100vh; 
+    overflow: hidden; 
+    max-width: 600px; /* Forces PC to look like a mobile screen */
+    margin: 0 auto;   /* Centers it on the screen */
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+}
 
 .screen { display: none; flex-direction: column; height: 100%; padding: 15px; overflow-y: auto; }
 .screen.active { display: flex; }
