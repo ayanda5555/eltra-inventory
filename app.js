@@ -2,7 +2,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbyDcuWuG2Ho6Qq4X9XJ_-zZ
 let sessionToken = localStorage.getItem('eltra_token');
 let currentUser = JSON.parse(localStorage.getItem('eltra_user'));
 
-// --- OFFLINE DB SETUP (IndexedDB) ---
+// --- OFFLINE DB SETUP ---
 let db;
 const dbRequest = indexedDB.open("EltraDB", 1);
 dbRequest.onupgradeneeded = function(e) {
@@ -30,7 +30,7 @@ async function apiRequest(action, payload = {}) {
     return await res.json();
 }
 
-// --- LOGIN ---
+// --- AUTH ---
 async function doLogin() {
     const code = document.getElementById('login-user').value;
     const pin = document.getElementById('login-pin').value;
@@ -68,7 +68,16 @@ async function initDashboard() {
     } catch(e) { console.log("Offline, using cached dashboard"); }
 }
 
-// --- RECEIVE STOCK WITH PHOTO & OFFLINE QUEUE ---
+// --- DROPDOWNS ---
+async function loadDropdowns() {
+    const res = await apiRequest('getItems');
+    if (res.success) {
+        let html = '<option value="">-- Select Item --</option>';
+        res.data.forEach(i => html += `<option value="${i.ItemID}">${i.ItemName} (Stock: ${i.CurrentStock})</option>`);
+        if(document.getElementById('iss-item')) document.getElementById('iss-item').innerHTML = html;
+    }
+}
+
 async function loadReceiveForm() {
     const res = await apiRequest('getItems');
     if (res.success) {
@@ -78,10 +87,43 @@ async function loadReceiveForm() {
     }
 }
 
+async function loadCategoriesAndSuppliers() {
+    const resCat = await apiRequest('getCategories');
+    if (resCat.success) {
+        let html = '<option value="">-- Select Category --</option>';
+        resCat.data.forEach(c => html += `<option value="${c.CategoryID}">${c.CategoryName}</option>`);
+        document.getElementById('add-category').innerHTML = html;
+    }
+    const resSup = await apiRequest('getSuppliers');
+    if (resSup.success) {
+        let html = '<option value="">-- Select Supplier --</option>';
+        resSup.data.forEach(s => html += `<option value="${s.SupplierID}">${s.SupplierName}</option>`);
+        document.getElementById('add-supplier').innerHTML = html;
+    }
+}
+
+// --- FORMS ---
+async function submitItem() {
+    const payload = { 
+        ItemCode: document.getElementById('add-code').value, 
+        ItemName: document.getElementById('add-name').value, 
+        CategoryID: document.getElementById('add-category').value, 
+        Supplier: document.getElementById('add-supplier').value, 
+        UnitOfMeasure: document.getElementById('add-uom').value, 
+        MinimumStockLevel: document.getElementById('add-min').value, 
+        UnitCost: document.getElementById('add-cost').value, 
+        Brand: document.getElementById('add-brand').value 
+    };
+    const res = await apiRequest('addItem', payload);
+    if (res.success) { alert(`Item Added! Code: ${res.qrCode}`); showScreen('screen-dashboard'); initDashboard(); } 
+    else { alert("Error: " + res.message); }
+}
+
 async function submitReceive() {
     const itemId = document.getElementById('rec-item').value;
     const qty = document.getElementById('rec-qty').value;
     const ref = document.getElementById('rec-ref').value;
+    const cost = document.getElementById('rec-cost').value;
     const photoInput = document.getElementById('rec-photo');
     
     if (!itemId || !qty) return alert("Select item and quantity");
@@ -92,23 +134,21 @@ async function submitReceive() {
     let photoUrl = "";
     let offlineId = 'OFF-' + new Date().getTime() + '-' + Math.random().toString(36).substring(7);
 
-    // 1. If Photo, Upload First (Requires Online)
     if (photoInput.files.length > 0 && navigator.onLine) {
         const reader = new FileReader();
         reader.onload = async function(e) {
             const upRes = await apiRequest('uploadPhoto', { base64: e.target.result, filename: photoInput.files[0].name });
             if (upRes.success) photoUrl = upRes.url;
-            executeSave(itemId, qty, ref, photoUrl, offlineId, btn);
+            executeSave(itemId, qty, ref, cost, photoUrl, offlineId, btn);
         };
         reader.readAsDataURL(photoInput.files[0]);
     } else {
-        if (photoInput.files.length > 0 && !navigator.onLine) alert("Photos cannot be uploaded offline. Saving text data only.");
-        executeSave(itemId, qty, ref, "", offlineId, btn);
+        executeSave(itemId, qty, ref, cost, "", offlineId, btn);
     }
 }
 
-async function executeSave(itemId, qty, ref, photoUrl, offlineId, btn) {
-    let finalNotes = `Ref: ${ref} | Photo: ${photoUrl} | OfflineID: ${offlineId}`;
+async function executeSave(itemId, qty, ref, cost, photoUrl, offlineId, btn) {
+    let finalNotes = `Ref: ${ref} | Cost: $${cost} | Photo: ${photoUrl} | OfflineID: ${offlineId}`;
     const payload = { ItemID: itemId, Quantity: qty, MovementType: 'RECEIVE', Notes: finalNotes };
 
     if (navigator.onLine) {
@@ -123,6 +163,16 @@ async function executeSave(itemId, qty, ref, photoUrl, offlineId, btn) {
     btn.innerText = "Record Receipt"; btn.disabled = false;
 }
 
+async function submitIssue() {
+    const itemId = document.getElementById('iss-item').value;
+    const qty = document.getElementById('iss-qty').value;
+    if (!itemId || !qty) return alert("Select item and quantity");
+    
+    const res = await apiRequest('stockMovement', { ItemID: itemId, Quantity: qty, MovementType: 'ISSUE' });
+    if (res.success) { alert("Stock Issued!"); showScreen('screen-dashboard'); initDashboard(); } 
+    else { alert("Error: " + res.message); }
+}
+
 function saveOffline(itemId, qty, type, notes, offlineId) {
     const tx = db.transaction(["syncQueue"], "readwrite");
     tx.objectStore("syncQueue").add({ offlineId: offlineId, ItemID: itemId, Quantity: qty, MovementType: type, Notes: notes, UserID: currentUser.id });
@@ -132,7 +182,6 @@ function saveOffline(itemId, qty, type, notes, offlineId) {
     };
 }
 
-// --- MANUAL SYNC ---
 async function syncOfflineData() {
     if (!navigator.onLine) return alert("Cannot sync. No internet.");
     const tx = db.transaction(["syncQueue"], "readonly");
@@ -145,7 +194,6 @@ async function syncOfflineData() {
         document.getElementById('sync-btn').innerText = "Syncing...";
         const res = await apiRequest('syncOfflineQueue', queue);
         if (res.success) {
-            // Clear synced items
             const clearTx = db.transaction(["syncQueue"], "readwrite");
             clearTx.objectStore("syncQueue").clear();
             alert("✅ " + res.message);
